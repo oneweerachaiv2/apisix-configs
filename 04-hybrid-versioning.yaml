@@ -1,0 +1,149 @@
+# =============================================================================
+# Hybrid API Versioning Strategy for APISIX
+# =============================================================================
+# Combines multiple versioning strategies with fallback behavior:
+# Priority: 1) URI Path > 2) Header > 3) Query Param > 4) Default
+#
+# This provides maximum flexibility for API consumers while maintaining
+# clear versioning semantics.
+# =============================================================================
+
+routes:
+  # -----------------------------------------------------------------------------
+  # PATTERN 1: Primary Path Versioning with Header Override
+  # Base route uses path versioning, but allows header to specify sub-versions
+  # -----------------------------------------------------------------------------
+  
+  - id: "api-v2-with-subversions"
+    uri: "/api/v2/accounts*"
+    name: "Accounts API V2 with Sub-version Support"
+    desc: "V2 API that supports X-Sub-Version header for minor versions"
+    plugins:
+      traffic-split:
+        rules:
+          # Route to V2.1 (bug fixes) when X-Sub-Version: 2.1
+          - match:
+              - vars:
+                  - ["http_x_sub_version", "==", "2.1"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: accounts-v2-1-service
+                      port: 8082
+                      weight: 1
+                weight: 1
+          
+          # Route to V2.2 (latest minor) when X-Sub-Version: 2.2 or "latest"
+          - match:
+              - vars:
+                  - ["http_x_sub_version", "==", "2.2"]
+              - vars:
+                  - ["http_x_sub_version", "==", "latest"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: accounts-v2-2-service
+                      port: 8082
+                      weight: 1
+                weight: 1
+    
+    # Default to V2.0 (original V2)
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: accounts-v2-service
+          port: 8082
+          weight: 1
+
+  # -----------------------------------------------------------------------------
+  # PATTERN 2: Canary/Gradual Rollout with Version Weight
+  # Gradually shift traffic from old to new version
+  # -----------------------------------------------------------------------------
+  
+  - id: "api-v1-v2-canary"
+    uri: "/api/payments*"
+    name: "Payments API - Canary Deployment V1→V2"
+    desc: "Gradual migration: 80% V1, 20% V2 (adjust weights as rollout progresses)"
+    plugins:
+      traffic-split:
+        rules:
+          # Primary rule: split between versions
+          - weighted_upstreams:
+              # 80% to V1 (decreasing)
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: payments-v1-service
+                      port: 8081
+                      weight: 1
+                weight: 80
+              # 20% to V2 (increasing during rollout)
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: payments-v2-service
+                      port: 8082
+                      weight: 1
+                weight: 20
+      
+      # Add header to show which version served the request
+      response-rewrite:
+        headers:
+          set:
+            X-Served-By-Version: "$upstream_addr"
+    
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: payments-v1-service
+          port: 8081
+          weight: 1
+
+  # -----------------------------------------------------------------------------
+  # PATTERN 3: A/B Testing with User Segments
+  # Route specific users to new versions for testing
+  # -----------------------------------------------------------------------------
+  
+  - id: "api-ab-testing"
+    uri: "/api/recommendations*"
+    name: "Recommendations API - A/B Testing"
+    desc: "Route beta users to V2, everyone else to V1"
+    plugins:
+      traffic-split:
+        rules:
+          # Route users with X-Beta-User header to V2
+          - match:
+              - vars:
+                  - ["http_x_beta_user", "==", "true"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: recommendations-v2-service
+                      port: 8082
+                      weight: 1
+                weight: 1
+          
+          # Route specific client IDs to V2 for testing
+          - match:
+              - vars:
+                  - ["http_x_client_id", "~~", "^(beta-|test-)"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: recommendations-v2-service
+                      port: 8082
+                      weight: 1
+                weight: 1
+    
+    # Default to stable V1
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: recommendations-v1-service
+          port: 8081
+          weight: 1
+

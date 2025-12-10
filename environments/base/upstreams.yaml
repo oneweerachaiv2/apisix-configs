@@ -1,0 +1,66 @@
+# =============================================================================
+# Base Upstream Definitions - Environment-agnostic
+# =============================================================================
+# Upstream services are patched per environment to point to correct backends
+# =============================================================================
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixUpstream
+metadata:
+  name: users-v1-upstream
+  labels:
+    api-version: "v1"
+spec:
+  externalNodes:
+    - name: users-v1-service.default.svc.cluster.local
+      port: 8080
+      weight: 100
+      type: Domain
+  scheme: http
+  retries: 3
+  timeout:
+    connect: 5s
+    send: 10s
+    read: 10s
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixUpstream
+metadata:
+  name: users-v2-upstream
+  labels:
+    api-version: "v2"
+spec:
+  externalNodes:
+    - name: users-v2-service.default.svc.cluster.local
+      port: 8080
+      weight: 100
+      type: Domain
+  scheme: http
+  retries: 3
+  timeout:
+    connect: 5s
+    send: 15s
+    read: 15s
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixUpstream
+metadata:
+  name: users-v3-upstream
+  labels:
+    api-version: "v3"
+spec:
+  externalNodes:
+    - name: users-v3-service.default.svc.cluster.local
+      port: 8080
+      weight: 100
+      type: Domain
+  scheme: http
+  retries: 3
+  timeout:
+    connect: 5s
+    send: 15s
+    read: 15s
+

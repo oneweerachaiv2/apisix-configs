@@ -1,0 +1,77 @@
+# =============================================================================
+# SIT (System Integration Testing) Environment Overlay
+# =============================================================================
+# Integration testing environment with moderate restrictions
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: apisix-api-versioning-sit
+
+namespace: apisix-sit
+
+resources:
+  - ../base
+  - rate-limit-plugin.yaml  # SIT-specific rate limiting
+
+commonLabels:
+  environment: sit
+  tier: testing
+
+namePrefix: sit-
+
+patches:
+  - target:
+      kind: ApisixRoute
+      name: api-v1-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: users-v1-service.sit.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8080
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: sit
+
+  - target:
+      kind: ApisixRoute
+      name: api-v2-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: users-v2-service.sit.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8080
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: sit
+
+  - target:
+      kind: ApisixRoute
+      name: api-v3-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: users-v3-service.sit.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8080
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: sit
+
+configMapGenerator:
+  - name: api-versioning-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=sit
+      - LOG_LEVEL=info
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_COUNT=1000
+      - RATE_LIMIT_WINDOW=60
+

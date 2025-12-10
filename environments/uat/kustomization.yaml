@@ -1,0 +1,79 @@
+# =============================================================================
+# UAT (User Acceptance Testing) Environment Overlay
+# =============================================================================
+# Pre-production environment with production-like settings
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: apisix-api-versioning-uat
+
+namespace: apisix-uat
+
+resources:
+  - ../base
+  - rate-limit-plugin.yaml
+  - auth-plugin.yaml  # UAT requires authentication
+
+commonLabels:
+  environment: uat
+  tier: pre-production
+
+namePrefix: uat-
+
+patches:
+  - target:
+      kind: ApisixRoute
+      name: api-v1-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: users-v1-service.uat.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8080
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: uat
+
+  - target:
+      kind: ApisixRoute
+      name: api-v2-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: users-v2-service.uat.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8080
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: uat
+
+  - target:
+      kind: ApisixRoute
+      name: api-v3-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: users-v3-service.uat.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8080
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: uat
+
+configMapGenerator:
+  - name: api-versioning-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=uat
+      - LOG_LEVEL=info
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_COUNT=500
+      - RATE_LIMIT_WINDOW=60
+      - AUTH_REQUIRED=true
+

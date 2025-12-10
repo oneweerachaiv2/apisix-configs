@@ -1,0 +1,140 @@
+# =============================================================================
+# Header-Based API Versioning for APISIX
+# =============================================================================
+# Route requests based on custom header values (e.g., Api-Version: 2)
+# Uses the traffic-split plugin with vars matching
+#
+# Advantages:
+# - Clean URLs without version numbers
+# - Flexible version selection per request
+# - Good for internal APIs and SDK-based clients
+#
+# Disadvantages:
+# - Harder to test manually (need to set headers)
+# - Caching challenges (headers not always in cache key)
+# - Less discoverable for new developers
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# APPROACH 1: Single Route with Traffic-Split Plugin
+# Route to different upstreams based on header value
+# -----------------------------------------------------------------------------
+
+routes:
+  - id: "api-users-header-versioning"
+    uri: "/api/users*"
+    name: "Users API - Header-Based Versioning"
+    desc: "Routes to different backends based on Api-Version header"
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    plugins:
+      # Traffic-split routes based on header values
+      traffic-split:
+        rules:
+          # Rule 1: Route to V1 backend when Api-Version: 1
+          - match:
+              - vars:
+                  - ["http_api_version", "==", "1"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: users-v1-service
+                      port: 8081
+                      weight: 1
+                weight: 1
+          
+          # Rule 2: Route to V2 backend when Api-Version: 2
+          - match:
+              - vars:
+                  - ["http_api_version", "==", "2"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: users-v2-service
+                      port: 8082
+                      weight: 1
+                weight: 1
+          
+          # Rule 3: Route to V3 backend when Api-Version: 3 or "latest"
+          - match:
+              - vars:
+                  - ["http_api_version", "==", "3"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: users-v3-service
+                      port: 8083
+                      weight: 1
+                weight: 1
+          
+          # Rule 4: Route to V3 when Api-Version: latest
+          - match:
+              - vars:
+                  - ["http_api_version", "==", "latest"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: users-v3-service
+                      port: 8083
+                      weight: 1
+                weight: 1
+    
+    # Default upstream when no Api-Version header is provided
+    # Falls back to V2 (current stable)
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: users-v2-service
+          port: 8082
+          weight: 1
+
+# -----------------------------------------------------------------------------
+# APPROACH 2: Accept Header Media Type Versioning
+# Uses standard HTTP content negotiation
+# e.g., Accept: application/vnd.myapi.v2+json
+# -----------------------------------------------------------------------------
+
+  - id: "api-orders-accept-versioning"
+    uri: "/api/orders*"
+    name: "Orders API - Accept Header Versioning"
+    desc: "Routes based on Accept header media type"
+    plugins:
+      traffic-split:
+        rules:
+          # V1: application/vnd.myapi.v1+json
+          - match:
+              - vars:
+                  - ["http_accept", "~~", "application/vnd\\.myapi\\.v1\\+json"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: orders-v1-service
+                      port: 8081
+                      weight: 1
+                weight: 1
+          
+          # V2: application/vnd.myapi.v2+json
+          - match:
+              - vars:
+                  - ["http_accept", "~~", "application/vnd\\.myapi\\.v2\\+json"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: orders-v2-service
+                      port: 8082
+                      weight: 1
+                weight: 1
+    
+    # Default to V2 for standard Accept headers
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: orders-v2-service
+          port: 8082
+          weight: 1
+

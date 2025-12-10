@@ -1,0 +1,110 @@
+# =============================================================================
+# Base Route Definitions - Environment-agnostic
+# =============================================================================
+# These routes use placeholders that get patched per environment
+# =============================================================================
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: api-v1-users
+  labels:
+    api-version: "v1"
+    status: "legacy"
+spec:
+  http:
+    - name: v1-users
+      match:
+        paths:
+          - /api/v1/users
+          - /api/v1/users/*
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+      backends:
+        - serviceName: users-v1-service  # Patched per environment
+          servicePort: 8080
+          resolveGranularity: endpoint
+      plugins:
+        - name: response-rewrite
+          enable: true
+          config:
+            headers:
+              set:
+                X-API-Version: "1"
+                X-API-Deprecated: "false"
+                X-Environment: "base"  # Patched per environment
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: api-v2-users
+  labels:
+    api-version: "v2"
+    status: "stable"
+spec:
+  http:
+    - name: v2-users
+      match:
+        paths:
+          - /api/v2/users
+          - /api/v2/users/*
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+      backends:
+        - serviceName: users-v2-service  # Patched per environment
+          servicePort: 8080
+          resolveGranularity: endpoint
+      plugins:
+        - name: response-rewrite
+          enable: true
+          config:
+            headers:
+              set:
+                X-API-Version: "2"
+                X-API-Deprecated: "false"
+                X-Environment: "base"  # Patched per environment
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: api-v3-users
+  labels:
+    api-version: "v3"
+    status: "beta"
+spec:
+  http:
+    - name: v3-users
+      match:
+        paths:
+          - /api/v3/users
+          - /api/v3/users/*
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+      backends:
+        - serviceName: users-v3-service  # Patched per environment
+          servicePort: 8080
+          resolveGranularity: endpoint
+      plugins:
+        - name: response-rewrite
+          enable: true
+          config:
+            headers:
+              set:
+                X-API-Version: "3"
+                X-API-Beta: "true"
+                X-Environment: "base"  # Patched per environment
+

@@ -1,0 +1,138 @@
+# =============================================================================
+# Query Parameter-Based API Versioning for APISIX
+# =============================================================================
+# Route requests based on query parameter (e.g., ?version=2)
+# Uses the traffic-split plugin with arg_* variable matching
+#
+# Advantages:
+# - Easy to test in browser
+# - No header configuration needed
+# - Can be bookmarked
+#
+# Disadvantages:
+# - Pollutes URLs with version info
+# - Caching issues (query params often excluded from cache)
+# - Not as clean as path versioning
+# =============================================================================
+
+routes:
+  - id: "api-products-query-versioning"
+    uri: "/api/products*"
+    name: "Products API - Query Parameter Versioning"
+    desc: "Routes based on ?version=X query parameter"
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    plugins:
+      traffic-split:
+        rules:
+          # Route to V1 when ?version=1
+          - match:
+              - vars:
+                  - ["arg_version", "==", "1"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: products-v1-service
+                      port: 8081
+                      weight: 1
+                weight: 1
+          
+          # Route to V2 when ?version=2
+          - match:
+              - vars:
+                  - ["arg_version", "==", "2"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: products-v2-service
+                      port: 8082
+                      weight: 1
+                weight: 1
+          
+          # Route to V3 when ?version=3 or ?version=latest
+          - match:
+              - vars:
+                  - ["arg_version", "==", "3"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: products-v3-service
+                      port: 8083
+                      weight: 1
+                weight: 1
+          
+          - match:
+              - vars:
+                  - ["arg_version", "==", "latest"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: products-v3-service
+                      port: 8083
+                      weight: 1
+                weight: 1
+    
+    # Default to V2 when no version parameter provided
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: products-v2-service
+          port: 8082
+          weight: 1
+
+# -----------------------------------------------------------------------------
+# Alternative: Multiple Parameter Support
+# Support both 'version' and 'v' as parameter names
+# -----------------------------------------------------------------------------
+
+  - id: "api-catalog-flexible-query"
+    uri: "/api/catalog*"
+    name: "Catalog API - Flexible Query Versioning"
+    desc: "Supports ?version=X, ?v=X, and ?api_version=X"
+    plugins:
+      traffic-split:
+        rules:
+          # Support ?version=1, ?v=1, or ?api_version=1
+          - match:
+              - vars:
+                  - ["arg_version", "==", "1"]
+              - vars:
+                  - ["arg_v", "==", "1"]
+              - vars:
+                  - ["arg_api_version", "==", "1"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: catalog-v1-service
+                      port: 8081
+                      weight: 1
+                weight: 1
+          
+          # Support multiple ways to request V2
+          - match:
+              - vars:
+                  - ["arg_version", "==", "2"]
+              - vars:
+                  - ["arg_v", "==", "2"]
+              - vars:
+                  - ["arg_api_version", "==", "2"]
+            weighted_upstreams:
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: catalog-v2-service
+                      port: 8082
+                      weight: 1
+                weight: 1
+    
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: catalog-v2-service
+          port: 8082
+          weight: 1
+

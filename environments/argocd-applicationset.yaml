@@ -1,0 +1,64 @@
+# =============================================================================
+# ArgoCD ApplicationSet for Multi-Environment Deployment
+# =============================================================================
+# Automatically deploys API versioning routes to all environments
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apisix-api-versioning
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: https://kubernetes.default.svc
+            namespace: apisix-dev
+            syncWave: "1"
+          - env: sit
+            cluster: https://kubernetes.default.svc
+            namespace: apisix-sit
+            syncWave: "2"
+          - env: uat
+            cluster: https://uat-cluster.example.com
+            namespace: apisix-uat
+            syncWave: "3"
+          - env: prod
+            cluster: https://prod-cluster.example.com
+            namespace: apisix-prod
+            syncWave: "4"
+
+  template:
+    metadata:
+      name: 'apisix-api-versioning-{{env}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{syncWave}}'
+    spec:
+      project: api-gateway
+      source:
+        repoURL: https://github.com/oneweerachaiv2/apisix-configs.git
+        targetRevision: main
+        path: api-versioning/environments/{{env}}
+      destination:
+        server: '{{cluster}}'
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+
+---
+# Promotion workflow using ArgoCD sync waves
+# DEV (wave 1) -> SIT (wave 2) -> UAT (wave 3) -> PROD (wave 4)
+

@@ -1,0 +1,48 @@
+# =============================================================================
+# PRODUCTION Environment Rate Limiting Plugin Config
+# =============================================================================
+# Strict rate limits for production traffic protection
+# =============================================================================
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: prod-rate-limit-config
+spec:
+  plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 100
+        time_window: 60
+        key_type: var
+        key: consumer_name  # Rate limit per consumer in production
+        rejected_code: 429
+        rejected_msg: "Rate limit exceeded. Please contact support."
+        policy: redis  # Use Redis for distributed rate limiting
+        redis_host: redis.prod.svc.cluster.local
+        redis_port: 6379
+        redis_password: "${REDIS_PASSWORD}"
+        redis_database: 0
+        redis_timeout: 1000
+
+---
+# Concurrent connection limiting
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: prod-limit-conn-config
+spec:
+  plugins:
+    - name: limit-conn
+      enable: true
+      config:
+        conn: 100
+        burst: 50
+        default_conn_delay: 0.1
+        key_type: var
+        key: remote_addr
+        rejected_code: 503
+        rejected_msg: "Service temporarily unavailable due to high load."
+

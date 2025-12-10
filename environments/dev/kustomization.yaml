@@ -1,0 +1,80 @@
+# =============================================================================
+# DEV Environment Overlay
+# =============================================================================
+# Development environment with relaxed settings for testing
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: apisix-api-versioning-dev
+
+namespace: apisix-dev
+
+# Inherit from base
+resources:
+  - ../base
+
+# Environment-specific labels
+commonLabels:
+  environment: dev
+  tier: development
+
+# Name prefix for all resources
+namePrefix: dev-
+
+# Patches for DEV environment
+patches:
+  # Patch routes with DEV-specific settings
+  - target:
+      kind: ApisixRoute
+      name: api-v1-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: httpbin.httpbin.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8000
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: development
+
+  - target:
+      kind: ApisixRoute
+      name: api-v2-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: httpbin.httpbin.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8000
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: development
+
+  - target:
+      kind: ApisixRoute
+      name: api-v3-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: httpbin.httpbin.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8000
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: development
+
+# DEV-specific config
+configMapGenerator:
+  - name: api-versioning-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=debug
+      - RATE_LIMIT_ENABLED=false
+

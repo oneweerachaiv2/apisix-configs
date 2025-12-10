@@ -1,0 +1,24 @@
+# =============================================================================
+# SIT Environment Rate Limiting Plugin Config
+# =============================================================================
+# Moderate rate limits for integration testing
+# =============================================================================
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: sit-rate-limit-config
+spec:
+  plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 1000
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        rejected_code: 429
+        rejected_msg: "SIT Rate limit exceeded. Please retry later."
+        policy: local
+

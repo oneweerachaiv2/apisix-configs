@@ -1,0 +1,134 @@
+# =============================================================================
+# API Version Deprecation Patterns for APISIX
+# =============================================================================
+# Patterns for gracefully deprecating and sunsetting old API versions
+# while maintaining backward compatibility during transition periods.
+# =============================================================================
+
+routes:
+  # -----------------------------------------------------------------------------
+  # PATTERN 1: Deprecated Version with Warning Headers
+  # Keep the version working but warn clients it will be removed
+  # -----------------------------------------------------------------------------
+  
+  - id: "api-v1-deprecated-users"
+    uri: "/api/v1/users*"
+    name: "Users API V1 - DEPRECATED"
+    desc: "V1 is deprecated. Migrate to V2 by 2025-06-01"
+    status: 1  # Still enabled
+    plugins:
+      # Add deprecation warnings to every response
+      response-rewrite:
+        headers:
+          set:
+            X-API-Version: "1"
+            X-API-Deprecated: "true"
+            X-API-Deprecation-Date: "2025-03-01"
+            X-API-Sunset-Date: "2025-06-01"
+            X-API-Upgrade-To: "https://api.example.com/api/v2/users"
+            Warning: "299 - \"API v1 is deprecated. Please upgrade to v2.\""
+            Link: "</api/v2/users>; rel=\"successor-version\""
+      
+      # Log deprecated version usage for monitoring migration
+      http-logger:
+        uri: "http://logging-service:8080/logs"
+        batch_max_size: 50
+        inactive_timeout: 2
+        include_req_body: false
+      
+      # Lower rate limit to encourage migration
+      limit-count:
+        count: 50
+        time_window: 60
+        key_type: "var"
+        key: "remote_addr"
+        rejected_code: 429
+    
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: users-v1-service
+          port: 8081
+          weight: 1
+
+  # -----------------------------------------------------------------------------
+  # PATTERN 2: Sunset Version - Returns 410 Gone
+  # Version is completely retired, returns helpful error
+  # -----------------------------------------------------------------------------
+  
+  - id: "api-v0-sunset-users"
+    uri: "/api/v0/users*"
+    name: "Users API V0 - SUNSET"
+    desc: "V0 has been retired. Returns 410 Gone."
+    plugins:
+      # Return 410 Gone with migration information
+      response-rewrite:
+        status_code: 410
+        body: |
+          {
+            "error": "API_VERSION_SUNSET",
+            "message": "API version 0 has been retired and is no longer available.",
+            "sunset_date": "2024-12-01",
+            "migration_guide": "https://docs.example.com/api/migration-v0-to-v2",
+            "current_version": "v2",
+            "upgrade_url": "/api/v2/users"
+          }
+        headers:
+          set:
+            Content-Type: "application/json"
+            X-API-Sunset: "true"
+            X-API-Sunset-Date: "2024-12-01"
+            Link: "</api/v2/users>; rel=\"successor-version\""
+    
+    # Dummy upstream (request won't reach it due to response-rewrite)
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: 127.0.0.1
+          port: 8080
+          weight: 1
+
+  # -----------------------------------------------------------------------------
+  # PATTERN 3: Redirect to New Version
+  # Automatically redirect old version requests to new version
+  # -----------------------------------------------------------------------------
+  
+  - id: "api-v1-redirect-orders"
+    uri: "/api/v1/orders*"
+    name: "Orders API V1 - Redirect to V2"
+    desc: "Redirects V1 requests to V2 (for compatible endpoints)"
+    plugins:
+      redirect:
+        # Replace v1 with v2 in the URI
+        regex_uri: ["^/api/v1/(.*)$", "/api/v2/$1"]
+        ret_code: 301  # Permanent redirect (cacheable)
+        # Use 307 for POST/PUT to preserve method: ret_code: 307
+
+  # -----------------------------------------------------------------------------
+  # PATTERN 4: Shadow Mode - Duplicate Requests to New Version
+  # Send requests to both old and new version for comparison testing
+  # -----------------------------------------------------------------------------
+  
+  - id: "api-v1-shadow-testing"
+    uri: "/api/v1/inventory*"
+    name: "Inventory API V1 with Shadow to V2"
+    desc: "Production traffic to V1, shadow traffic to V2 for testing"
+    plugins:
+      # Mirror requests to V2 for comparison testing
+      proxy-mirror:
+        host: "http://inventory-v2-service:8082"
+        sample_ratio: 0.1  # Mirror 10% of requests
+      
+      response-rewrite:
+        headers:
+          set:
+            X-API-Version: "1"
+            X-Shadow-Testing: "active"
+    
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: inventory-v1-service
+          port: 8081
+          weight: 1
+

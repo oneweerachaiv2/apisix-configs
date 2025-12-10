@@ -1,0 +1,101 @@
+# =============================================================================
+# PRODUCTION Environment Overlay
+# =============================================================================
+# Production environment with strict security and monitoring
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: apisix-api-versioning-prod
+
+namespace: apisix-prod
+
+resources:
+  - ../base
+  - rate-limit-plugin.yaml
+  - auth-plugin.yaml
+  - monitoring-plugin.yaml
+
+commonLabels:
+  environment: prod
+  tier: production
+
+namePrefix: prod-
+
+# Production annotations
+commonAnnotations:
+  monitoring.enabled: "true"
+  alerting.enabled: "true"
+
+patches:
+  - target:
+      kind: ApisixRoute
+      name: api-v1-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: users-v1-service.prod.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8080
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: production
+      - op: add
+        path: /spec/http/0/plugins/-
+        value:
+          name: prometheus
+          enable: true
+
+  - target:
+      kind: ApisixRoute
+      name: api-v2-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: users-v2-service.prod.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8080
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: production
+      - op: add
+        path: /spec/http/0/plugins/-
+        value:
+          name: prometheus
+          enable: true
+
+  - target:
+      kind: ApisixRoute
+      name: api-v3-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: users-v3-service.prod.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8080
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: production
+      - op: add
+        path: /spec/http/0/plugins/-
+        value:
+          name: prometheus
+          enable: true
+
+configMapGenerator:
+  - name: api-versioning-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=prod
+      - LOG_LEVEL=warn
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_COUNT=100
+      - RATE_LIMIT_WINDOW=60
+      - AUTH_REQUIRED=true
+      - MONITORING_ENABLED=true
+

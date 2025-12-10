@@ -1,0 +1,27 @@
+# =============================================================================
+# UAT Environment Authentication Plugin Config
+# =============================================================================
+# JWT authentication required in UAT
+# =============================================================================
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: uat-auth-config
+spec:
+  plugins:
+    - name: jwt-auth
+      enable: true
+      config:
+        header: Authorization
+        query: token
+        cookie: jwt
+    - name: consumer-restriction
+      enable: true
+      config:
+        type: consumer_name
+        whitelist:
+          - uat-tester
+          - uat-admin
+

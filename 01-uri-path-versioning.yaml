@@ -1,0 +1,153 @@
+# =============================================================================
+# URI Path-Based API Versioning for APISIX
+# =============================================================================
+# This is the RECOMMENDED approach for API versioning.
+# Each version has its own URI prefix (e.g., /v1/users, /v2/users)
+# 
+# Advantages:
+# - Clear, explicit version in URL
+# - Easy to cache (unique URIs per version)
+# - Simple to test and debug
+# - Works with any HTTP client
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# STRATEGY 1: Separate Routes Per Version
+# Each API version has its own route pointing to different upstreams
+# -----------------------------------------------------------------------------
+
+# API Version 1 Routes
+routes:
+  # V1 - Users API (Legacy version)
+  - id: "api-v1-users"
+    uri: "/api/v1/users*"
+    name: "API V1 - Users Service"
+    desc: "Version 1 of the Users API - Legacy, maintained for backward compatibility"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    plugins:
+      # Add version header to response
+      response-rewrite:
+        headers:
+          set:
+            X-API-Version: "1"
+            X-API-Deprecated: "false"
+      # Rate limiting for v1
+      limit-count:
+        count: 100
+        time_window: 60
+        key_type: "var"
+        key: "remote_addr"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: users-v1-service
+          port: 8081
+          weight: 1
+      timeout:
+        connect: 5
+        send: 10
+        read: 10
+
+  # V2 - Users API (Current stable version)
+  - id: "api-v2-users"
+    uri: "/api/v2/users*"
+    name: "API V2 - Users Service"
+    desc: "Version 2 of the Users API - Current stable version"
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    plugins:
+      response-rewrite:
+        headers:
+          set:
+            X-API-Version: "2"
+            X-API-Deprecated: "false"
+      # Higher rate limit for v2
+      limit-count:
+        count: 200
+        time_window: 60
+        key_type: "var"
+        key: "remote_addr"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: users-v2-service
+          port: 8082
+          weight: 1
+      timeout:
+        connect: 5
+        send: 10
+        read: 15
+
+  # V3 - Users API (Beta/Preview version)
+  - id: "api-v3-users"
+    uri: "/api/v3/users*"
+    name: "API V3 - Users Service (Beta)"
+    desc: "Version 3 of the Users API - Beta version with new features"
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    plugins:
+      response-rewrite:
+        headers:
+          set:
+            X-API-Version: "3"
+            X-API-Beta: "true"
+            X-API-Warning: "This is a beta version. Breaking changes may occur."
+      # Conservative rate limit for beta
+      limit-count:
+        count: 50
+        time_window: 60
+        key_type: "var"
+        key: "remote_addr"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: users-v3-service
+          port: 8083
+          weight: 1
+      timeout:
+        connect: 5
+        send: 10
+        read: 15
+
+# -----------------------------------------------------------------------------
+# STRATEGY 2: Using proxy-rewrite to normalize URLs
+# Strip version prefix and pass version as header to upstream
+# Useful when backend handles versioning internally
+# -----------------------------------------------------------------------------
+
+  # V1 with URL rewriting
+  - id: "api-v1-products-rewrite"
+    uri: "/api/v1/products*"
+    name: "Products V1 with URL Rewrite"
+    plugins:
+      proxy-rewrite:
+        # Remove /v1 from the path before sending to upstream
+        regex_uri: ["^/api/v1/(.*)$", "/api/$1"]
+        headers:
+          set:
+            X-API-Version: "1"
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: products-service
+          port: 8080
+          weight: 1
+
+  # V2 with URL rewriting  
+  - id: "api-v2-products-rewrite"
+    uri: "/api/v2/products*"
+    name: "Products V2 with URL Rewrite"
+    plugins:
+      proxy-rewrite:
+        regex_uri: ["^/api/v2/(.*)$", "/api/$1"]
+        headers:
+          set:
+            X-API-Version: "2"
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: products-service
+          port: 8080
+          weight: 1
+

@@ -1,0 +1,24 @@
+# =============================================================================
+# UAT Environment Rate Limiting Plugin Config
+# =============================================================================
+# Production-like rate limits for acceptance testing
+# =============================================================================
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: uat-rate-limit-config
+spec:
+  plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 500
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        rejected_code: 429
+        rejected_msg: "UAT Rate limit exceeded."
+        policy: local
+
