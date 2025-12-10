@@ -69,6 +69,20 @@ patches:
         path: /spec/http/0/plugins/0/config/headers/set/X-Environment
         value: development
 
+  - target:
+      kind: ApisixRoute
+      name: api-v4-users
+    patch: |-
+      - op: replace
+        path: /spec/http/0/backends/0/serviceName
+        value: httpbin.httpbin.svc.cluster.local
+      - op: replace
+        path: /spec/http/0/backends/0/servicePort
+        value: 8000
+      - op: replace
+        path: /spec/http/0/plugins/0/config/headers/set/X-Environment
+        value: development
+
 # DEV-specific config
 configMapGenerator:
   - name: api-versioning-config
