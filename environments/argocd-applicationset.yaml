@@ -40,7 +40,7 @@ spec:
       source:
         repoURL: https://github.com/oneweerachaiv2/apisix-configs.git
         targetRevision: main
-        path: api-versioning/environments/{{env}}
+        path: environments/{{env}}
       destination:
         server: '{{cluster}}'
         namespace: '{{namespace}}'
