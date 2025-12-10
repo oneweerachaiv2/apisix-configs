@@ -10,7 +10,7 @@ kind: Kustomization
 metadata:
   name: apisix-api-versioning-dev
 
-namespace: apisix-dev
+namespace: apisix
 
 # Inherit from base
 resources:
