@@ -64,3 +64,22 @@ spec:
     send: 15s
     read: 15s
 
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixUpstream
+metadata:
+  name: users-v4-upstream
+  labels:
+    api-version: "v4"
+spec:
+  externalNodes:
+    - name: users-v4-service.default.svc.cluster.local
+      port: 8080
+      weight: 100
+      type: Domain
+  scheme: http
+  retries: 3
+  timeout:
+    connect: 5s
+    send: 15s
+    read: 15s

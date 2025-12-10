@@ -108,3 +108,37 @@ spec:
                 X-API-Beta: "true"
                 X-Environment: "base"  # Patched per environment
 
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: api-v4-users
+  labels:
+    api-version: "v4"
+    status: "experimental"
+spec:
+  http:
+    - name: v4-users
+      match:
+        paths:
+          - /api/v4/users
+          - /api/v4/users/*
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+      backends:
+        - serviceName: users-v4-service  # Patched per environment
+          servicePort: 8080
+          resolveGranularity: endpoint
+      plugins:
+        - name: response-rewrite
+          enable: true
+          config:
+            headers:
+              set:
+                X-API-Version: "4"
+                X-API-Experimental: "true"
+                X-Environment: "base"  # Patched per environment
